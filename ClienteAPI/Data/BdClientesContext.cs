@@ -65,7 +65,9 @@ public partial class BdClientesContext : DbContext
 
             entity.ToTable("TIPOS_DOCUMENTOS");
 
-            entity.Property(e => e.IdTipoDocumento).HasColumnName("ID_TIPO_DOCUMENTO");
+            entity.Property(e => e.IdTipoDocumento)
+                .ValueGeneratedOnAdd()
+                .HasColumnName("ID_TIPO_DOCUMENTO");
             entity.Property(e => e.DesTipoDocumento)
                 .HasMaxLength(50)
                 .IsUnicode(false)
