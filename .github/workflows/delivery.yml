@@ -1,0 +1,46 @@
+name: delivery
+on:
+  workflow_dispatch:
+
+jobs:
+  delivery:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Levantar servicios
+        run: docker compose up -d --build
+
+      - name: Esperar a SQL Server y cargar la base de datos
+        run: |
+          for i in $(seq 1 30); do
+            docker exec bd_clientes /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Upt.2022 -C -Q "SELECT 1" && break
+            sleep 5
+          done
+          docker exec bd_clientes /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Upt.2022 -C -i /tmp/clientes.sql
+
+      - name: Generar trafico hacia la API
+        run: |
+          for i in $(seq 1 20); do
+            curl -s http://localhost:5000/api/TiposDocumentos > /dev/null
+            curl -s http://localhost:5000/api/TiposDocumentos/1 > /dev/null
+            sleep 1
+          done
+
+      - name: Consultar metrica en Prometheus
+        run: |
+          sleep 10
+          curl -s "http://localhost:9090/api/v1/query?query=http_request_duration_seconds_count" | tee metric.json
+          curl -s "http://localhost:9090/api/v1/query?query=aspnetcore_healthcheck_status" | tee health.json
+
+      - name: Publicar resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: metricas
+          path: |
+            metric.json
+            health.json
+
+      - name: Apagar servicios
+        if: always()
+        run: docker compose down
